@@ -1,8 +1,10 @@
 'T-FACE CR1000 Series Datalogger Program
-'2024 updated for new irr's Montes 20240624
-'2022 updated for new irr's Montes 20220630
-'date: 06/01/2018
-'program author: Carl Bernacchi
+'Creation date: 2018-06-01
+'Last update: 2025-03-28 - JAM
+'program authors:  Carl Bernacchi - primary
+'                  Chris Montes - modifications
+'                  Jesse McGrath - EKM Omnimeter metering code
+
 
 '  This program will operate the T-FACE Experiment.
 
@@ -22,30 +24,28 @@
 '      Another jumper also needes to be changed to set the address of a second
 '      SDM-CV04 to be address 1.
 '   
+
+'EKM Omnimeter 1 v.3 pin 14 connected to CR1000X pin P2
+'EKM Omnimeter 1 v.3 pin 15 connected to CR1000X pin ground
+'The Omnimeter sends 800 pulses per KWh
   
 												
 'Enter constants for the TFACE IRTs provided by Apogee
-'T-FACE Reference plot SN 6237 (old 6221)
+'T-FACE Reference plot SN 1234
+Const r_mc2 = 133757
+Const r_mc1 = 11739300
+Const r_mc0 = 2138210000
+Const r_bc2 = 5021.86
+Const r_bc1 = 366816
+Const r_bc0 = -35064200
 
-					
-
-Const r_mc2 = 65676.1
-Const r_mc1 = 7545060
-Const r_mc0 = 1413490000
-Const r_bc2 = 5152.9
-Const r_bc1 = 182740
-Const r_bc0 = 1065380
-
-'T-FACE Heated plot SN 1232
-Const h_mc2 = 140699
-Const h_mc1 = 13384000
-Const h_mc0 = 2567010000
-Const h_bc2 = 2172.26
-Const h_bc1 = 436686
-Const h_bc0 = -24632400
-					
-
-
+'T-FACE Heated plot SN 6184
+Const h_mc2 = 66863.6
+Const h_mc1 = 7707660
+Const h_mc0 = 1377880000
+Const h_bc2 = 7400.48
+Const h_bc1 = 139180
+Const h_bc0 = -3439490			
 
 'Below are constants for the control of the heater outputs.
 Const twopi = 6.283185
@@ -78,6 +78,9 @@ Public Wind
 Dim cons_m, cons_b, 
 Public upper_lim, lower_lim, heatmanset, rainon
 Dim Eff, Maxrad
+'Public variables for power metering using EKM Omnimeter I v.3
+Public ekmMeterPulseCount
+Public ekmMeterKWh
 
 Dim delta_t		 'need to set delta_t to execution interval
 Dim P_error, D_dMVovdt
@@ -107,6 +110,8 @@ DataTable (raw,True,-1) ' change based on plot
   Average (1,Pnl_Tmp,IEEE4,0)
   Sample (1,heatmanset,IEEE4)
   Average(1,rainon,FP2,0)
+  Totalize=(1,ekmMeterPulseCount,UINT4,0)
+  Sample(1,ekmMeterKWh,IEEE4)
 EndTable
 
 '  This Table is for the T-FACE critical variables.
@@ -297,7 +302,11 @@ BeginProg
     '    Else
     '      rainon = 0
     '    EndIf
-
+    
+    'EKM Omnimeter read pulse count and convert to KW*H
+    'I know the conversion can be done in one step with PulseCount() but want both the raw count and the conversion
+    PulseCount(ekmMeterPulseCount,1,2,1,0,1,0)
+    ekmMeterKWh = ekmMeterPulseCount/800
 
 
     CallTable raw ' change based on plot
@@ -307,4 +316,4 @@ BeginProg
 EndProg
 
 
-  ¶                   
+  Â¶                   
