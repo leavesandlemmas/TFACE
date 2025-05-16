@@ -56,7 +56,7 @@ Const MODE = -1
 ' Declare Public Variables
 Public Kp, Ki, Kd
 Public BattVolt, Pnl_Tmp
-Dim Nmbr_Htrs                ' Number heaters per SDM-CV04 output (1000W Mor FTE)
+Dim Nmbr_Htrs                ' Number heaters per SDM-CV04 output (1000 W Mor FTE)
 Public Target
 Public T_Diffrns
 Public IxKi_sum
@@ -95,7 +95,7 @@ Dim PID_CR, Radjust, Th_Adjust, Rheater, Rreflect, R_IRT
 ' Public rainctrl
 
 ' Define Data Tables (these are the final stored programs)
-'  !!!!!!Note to chcange the name of all the files according to plot.
+'  !!!!!!Note to change the name of all the files according to plot.
 ' This table is for all the heater array raw variables
 DataTable (raw, True, -1)           ' Change based on plot
   DataInterval(0, 10, Min, -1)
@@ -155,12 +155,12 @@ EndSub
 '  from the heaters.
 Sub CorrectRef
   ' Assume: fraction of thermal energy emitted by heater in the 8 to 14 um band
-  '        sensed by Apogee IRR-P is 0.14 for heater at 600C. Multiply by 0.9
-  '        for window transmittance > 0.13
+  '        sensed by Apogee IRR-P is 0.14 for heater at 600 degrees C.
+  '        Multiply by 0.9 for window transmittance > 0.13.
 
   ' Assume: fraction of thermal energy emitted by canopy in the 8 to 14 um band
-  '        sensed by Apogee IRR-P5 is 0.37 as per canopy at 20C. Multipy by 0.9
-  '        for window transmittance > 0.33.
+  '        sensed by Apogee IRR-P5 is 0.37 as per canopy at 20 degrees C.
+  '        Multipy by 0.9 for window transmittance > 0.33.
 
   ' Assume: emissivity of plant canopy = 0.98
 
@@ -186,11 +186,11 @@ EndSub
 ' Main Program
 BeginProg
   ' The following are constants for this experiment.  They represent the defaults by can be
-  '  changed real-time when the program is running.  Because these are all placed before the
-  '  'Scan' command (below) they are set when the program first compiles and then not again.
-  '  This means you can change them from the default when the programm is running without having
-  '  to recompile the program.  They can be changed via a 'connected' datalogger (from the graphs
-  '  or Num Display options when connected.
+  ' changed real-time when the program is running.  Because these are all placed before the
+  ' 'Scan' command (below) they are set when the program first compiles and then not again.
+  ' This means you can change them from the default when the programm is running without having
+  ' to recompile the program.  They can be changed via a 'connected' datalogger (from the graphs
+  ' or Num Display options when connected.
 
   Nmbr_Htrs = 24   ' Number of Mor FTE heaters (1000W)
   Target = 2.5     ' Temperature rise (degrees C) of heated plot in T-FACE above reference plot in daytime
@@ -210,17 +210,17 @@ BeginProg
   ' rainctrl = -1
 
 
-  PulseCountReset  ' This resets all pulse counts.  Not sure if its needed, but whatever.
+  PulseCountReset  ' This resets all pulse counts.  Not sure if it's needed, but whatever.
 
   Scan (5, Sec, 0, 0)
 
 
-    PanelTemp (Pnl_Tmp, _60Hz) ' This is the datalogger temperature
-    Battery (BattVolt)         ' This tells us the voltage of the battery powering the datalogger.
-    PulseCount (Wind, 1, 1, 0, 1, 0.09462, 0.2) ' This is for an optional windspeed sensor, which
-    ' Can be used to determine heater efficiency.
+    PanelTemp (Pnl_Tmp, _60Hz) ' This is the data logger temperature
+    Battery (BattVolt)         ' This tells us the voltage of the battery powering the data logger.
+    PulseCount (Wind, 1, 1, 0, 1, 0.09462, 0.2) ' This is for an optional wind speed sensor, which
+                                                ' can be used to determine heater efficiency.
 
-    '  his section will collect the IRR measurements from the T-FACE IRRs (both ref and heated)
+    ' This section will collect the IRR measurements from the T-FACE IRRs (both ref and heated).
 
     ' *******T-FACE***********
     ' Measure thermopile voltages of T-FACE Reference IRTs
@@ -300,9 +300,9 @@ BeginProg
     SDMCVO4 (ScldOut(), 4, 0, 10)' Send instruction to SDM-CV04s (mV, reps, SDMaddress, volts)
     '**********************************************************
 
-    ' This is the rain detector.  Should be present in only one plot.
-    ' ReadIO(raindet, 8) ' this checks is there is a 5V signal coming into C4,
-    ' if there is, it is raining.Only Necessary on Plot5.
+    ' This is the rain detector code.  It should be present in only one plot.
+    ' ReadIO(raindet, 8) ' This checks is there is a 5V signal coming into C4.
+    ' If there is, it is raining. Only Necessary on Plot 5.
     '    If raindet = 8 AND rainctrl =-1 Then
     '      rainon =  -1
     '    Else
