@@ -151,24 +151,27 @@ Sub PIRcontrol
 EndSub
 
 
-'  Adjust the apparent tempperature in the heated plot for radiation reflected
+'  Adjust the apparent temperature in the heated plot for radiation reflected
 '  from the heaters.
 Sub CorrectRef
   ' Assume: fraction of thermal energy emitted by heater in the 8 to 14 um band
   '        sensed by Apogee IRR-P is 0.14 for heater at 600C. Multiply by 0.9
   '        for window transmittance > 0.13
+
   ' Assume: fraction of thermal energy emitted by canopy in the 8 to 14 um band
   '        sensed by Apogee IRR-P5 is 0.37 as per canopy at 20C. Multipy by 0.9
   '        for window transmittance > 0.33.
+
   ' Assume: emissivity of plant canopy = 0.98
+
   Eff = 10 + 25 * EXP(-0.17 * Wind)  ' Compute efficiency of heater system (%) from wind (m/s)
-  Maxrad = Nmbr_Htrs * 1000 * (Eff / 100) / 7.07 ' Compute max down rad over 7.07 m2 plot
+  Maxrad = Nmbr_Htrs * 1000 * (Eff / 100) / 7.07 ' Compute max down rad over 7.07 m^2 plot
   Rheater = Maxrad * (PID_CR / 10)^2 ' Scale in proportion to the square of the
                                      ' last value of PID control, so that have full
                                      ' correction when heaters fully on and no correction
                                      ' when heaters off.
-  Rreflect = Rheater * (1 - 0.98) * 0.13 ' Calculate radiation from heater reflected by canopy
-  ' in 8-14 um band
+  Rreflect = Rheater * (1 - 0.98) * 0.13              ' Calculate radiation from heater reflected by canopy
+                                                      ' in 8-14 um band.
   R_IRT = 0.33 * SB * (T_correct + 273.15)^4          ' Calculate amount of energy sensed by IRT
   Radjust  = R_IRT - Rreflect                         ' Subtract the rediation from the heater
   Th_Adjust = ((Radjust / (SB * 0.33))^0.25) - 273.15 ' Calculate temperature from the radiation
@@ -231,7 +234,7 @@ BeginProg
 
     ' Calculation of target temperature
     TbodyRK = TbodyRC + 273.15
-    TtarRK = ((TbodyRK^4) + r_m *mV_tpileR + r_b)^0.25
+    TtarRK = (TbodyRK^4 + r_m *mV_tpileR + r_b)^0.25
     TtarRC = TtarRK - 273.15
 
     ' For Heated Plots
@@ -245,7 +248,7 @@ BeginProg
 
     ' Calculation of target temperature
     TbodyHK = TbodyHC + 273.15
-    TtarHK = ((TbodyHK^4) + h_m * mV_tpileH + h_b)^0.25
+    TtarHK = (TbodyHK^4 + h_m * mV_tpileH + h_b)^0.25
     TtarHC = TtarHK - 273.15
 
 
@@ -282,7 +285,7 @@ BeginProg
       PID_lmt = heatmanset
     EndIf
 
-    ' Set maximum temperature different - different for each experiment
+    ' Set maximum temperature difference - different for each experiment
      If T_Diffrns > Target + 2 Then IxKi_sum = 0
 
 
