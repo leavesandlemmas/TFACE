@@ -110,7 +110,7 @@ DataTable (raw,True,-1) ' change based on plot
   Average (1,Pnl_Tmp,IEEE4,0)
   Sample (1,heatmanset,IEEE4)
   Average(1,rainon,FP2,0)
-  Totalize=(1,ekmMeterPulseCount,UINT4,0)
+  Totalize(1,ekmMeterPulseCount,Long,0)
   Sample(1,ekmMeterKWh,IEEE4)
 EndTable
 
