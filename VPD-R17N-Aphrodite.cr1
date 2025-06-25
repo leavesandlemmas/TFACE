@@ -113,7 +113,7 @@ DataTable (raw, True, -1)           ' Change based on plot
   Average (1, Pnl_Tmp, IEEE4, 0)
   Sample (1, heatmanset, IEEE4)
   Average (1, rainon, FP2, 0)
-  Totalize = (1, ekmMeterPulseCount, UINT4, 0)
+  Totalize (1, ekmMeterPulseCount, UINT4, 0)
   Sample (1, ekmMeterKWh, IEEE4)
 EndTable
 
@@ -205,7 +205,7 @@ EndSub
 '****************************************************************************************
 ' Main Program
 BeginProg
-    Scan(0, sec, 0, 1)  ' Log the IRR parameters only once, at the start of the program.
+    Scan(1, sec, 0, 1)  ' Log the IRR parameters only once, at the start of the program.
         CallTable irr_params
         ExitScan
     NextScan
@@ -248,7 +248,7 @@ BeginProg
 
     ' *******T-FACE***********
     ' Measure thermopile voltages of T-FACE Reference IRTs
-    VoltDiff(mV_tpileR, 1, mV7_5, 1, True , 0, _60Hz, 1.0, 0) ' Diff channel 1
+    VoltDiff(mV_tpileR, 1, AutoRange, 1, True , 0, _60Hz, 1.0, 0) ' Diff channel 1
     ' Measure ratios Vx/Vb of body thermistors of Reference IRTs
     Therm109(TbodyRC, 1, 5, Vx1, 0, _60Hz, 1.0, 0) ' SE channel 5
 
@@ -263,7 +263,7 @@ BeginProg
 
     ' For Heated Plots
     ' Measure thermopile voltages of T-FACE Heated IRTs
-    VoltDiff (mV_tpileH, 1, mV7_5C, 2, True , 0, _60Hz, 1.0, 0)
+    VoltDiff (mV_tpileH, 1, AutoRange, 2, True , 0, _60Hz, 1.0, 0)
     ' Measure ratios Vx/Vb of body thermistors of Heated IRTs
     Therm109 (TbodyHC, 1, 6, Vx1, 0, _60Hz, 1.0, 0)
     ' Calculation of m (slope) and b (intercept) coefficients for target temperature calculation
