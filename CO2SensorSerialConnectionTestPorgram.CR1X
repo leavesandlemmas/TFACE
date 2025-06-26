@@ -1,0 +1,66 @@
+'CR1000X Series Datalogger
+'The datalogger type listed on line 1 determines the default instruction set,
+'compiler, and help files used for a program that uses the .DLD or .CRB program
+'extension. These options can also be set using the Set Datalogger Type dialog box
+'(CRBasic Editor|Tools|Set Datalogger Type).
+
+'For programming tips, copy this address to your browser
+'search window:https://www.campbellsci.com/videos/datalogger-programming
+
+'To create a different opening program template, type in new
+'instructions and select Template | Save as Default Template
+
+'Date: 06/26/2025
+'Program author: Scott, Eneji, and Justin
+
+'Declare Constants
+'Example:
+'CONST PI = 3.141592654
+
+'Declare Public Variables
+'Example:
+Public PTemp, Batt_volt
+Public CO2Sensor
+'Declare Private Variables
+'Example:
+Public RawLine As String * 201
+Public Field(9) As String * 10
+
+'Define Data Tables
+DataTable (Test,1,-1) 'Set table size to # of records, or -1 to autoallocate.
+  DataInterval (0,15,Sec,10)
+  Minimum (1,Batt_volt,FP2,False,False)
+  Sample (1,PTemp,FP2)
+  Sample (1, CO2Sensor, FP2)
+EndTable
+
+'Define Subroutines
+'Sub
+'EnterSub instructions here
+'EndSub
+
+'Main Program
+BeginProg
+  SerialOpen(comC1,19200,3,0,200)
+  'SerialOut(comC1,"S,1,4" + CHR(13),"+",2,0.1)
+  'SerialOut(comC1,"S,11,1" + CHR(13),"+",2,0.1)
+
+
+  Scan (500,mSec,0,0)
+    PanelTemp (PTemp,15000)
+    Battery (Batt_volt)
+    SerialInChk()
+    SerialIn(RawLine,comC1,0,CHR(13),200)
+    'RawLine$ = "M2, 123, 1312, 00, 3423, 5245, 64543, 1123, 151, 059.5, 99.53"
+    SplitStr (Field, RawLine, ",", 9, 5)
+    
+    CO2Sensor = Field(2)
+
+
+    'Enter other measurement instructions
+    'Call Output Tables
+    'Example:
+    CallTable Test
+  NextScan
+EndProg
+
