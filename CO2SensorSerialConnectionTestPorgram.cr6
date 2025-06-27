@@ -23,7 +23,7 @@ Public RawLine As String * 201
 Public Field(9) As String * 10
 
 'Define Data Tables
-DataTable (Test, 1, -1)  'Set table size to # of records, or -1 to autoallocate.
+DataTable (gas_concentrations, 1, -1)  'Set table size to # of records, or -1 to autoallocate.
   DataInterval (0, 5, Sec, 10)
   Minimum (1, Batt_volt, FP2, False, False)
   Sample (1, PTemp, FP2)
@@ -56,7 +56,7 @@ BeginProg
         Flowrate = Field(5)
         H20sensortmeperature = Field(7) 
     EndIf
-    CallTable Test
+    CallTable gas_concentrations
     CO2Sensor = NAN
     H2O = NAN
     Flowrate = NAN
