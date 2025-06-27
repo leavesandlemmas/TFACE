@@ -55,16 +55,15 @@ BeginProg
         H2O = Field(3)
         Flowrate = Field(5)
         H20sensortmeperature = Field(7) 
-    Else
-        CO2Sensor = NAN
-        H2O = NAN
-        Flowrate = NAN
-        H20sensortemperature = NAN
-  EndIf
-  CallTable Test
-  'Enter other measurement instructions
-  'Call Output Tables
-  'Example:
+    EndIf
+    CallTable Test
+    CO2Sensor = NAN
+    H2O = NAN
+    Flowrate = NAN
+    H20sensortemperature = NAN
+    'Enter other measurement instructions
+    'Call Output Tables
+    'Example:
 
-  NextScan
+    NextScan
 EndProg
