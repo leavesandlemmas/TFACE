@@ -22,8 +22,7 @@ Public H20sensortmeperature As Float
 Public RawLine As String * 201
 Public Field(9) As String * 10
 
-'Define Data Tables
-DataTable (gas_concentrations, 1, -1)  'Set table size to # of records, or -1 to autoallocate.
+DataTable (gas_concentrations, 1, -1)
   DataInterval (0, 5, Sec, 10)
   Minimum (1, Batt_volt, FP2, False, False)
   Sample (1, PTemp, FP2)
@@ -33,12 +32,6 @@ DataTable (gas_concentrations, 1, -1)  'Set table size to # of records, or -1 to
   Sample (1, H20sensortmeperature,FP2)
 EndTable
 
-'Define Subroutines
-'Sub
-'EnterSub instructions here
-'EndSub
-
-'Main Program
 BeginProg
   SerialOpen(comC1, 19200, 0, 0, 10000)
   'SerialOut(comC1, "S,1,4" + CHR(13), "+", 2, 0.1)
@@ -48,22 +41,20 @@ BeginProg
     PanelTemp (PTemp, 15000)
     Battery (Batt_volt)
     SerialIn(RawLine, comC1, 0, CHR(13), 200)
-    'RawLine$ = "M2, 123, 1312, 00, 3423, 5245, 64543, 1123, 151, 059.5, 99.53"
     SplitStr (Field, RawLine, ",", 9, 5)
+
     If Field(1) = "M2" Then
         CO2Sensor = Field(2)
         H2O = Field(3)
         Flowrate = Field(5)
-        H20sensortmeperature = Field(7) 
+        H20sensortmeperature = Field(7)
     EndIf
+
     CallTable gas_concentrations
     CO2Sensor = NAN
     H2O = NAN
     Flowrate = NAN
     H20sensortemperature = NAN
-    'Enter other measurement instructions
-    'Call Output Tables
-    'Example:
 
     NextScan
 EndProg
