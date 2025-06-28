@@ -1,0 +1,52 @@
+
+'Declare Public Variables
+Public BattV, PanelT
+Public DetectorTC, DetectorTK, TargetmV, m, b, TargetTK, TargetTC
+Public mC2
+Public mC1
+Public mC0
+Public bC2
+Public bC1
+Public bC0
+
+
+'Define Data Tables
+DataTable (SurfaceT,1,-1)
+	DataInterval (0,1,Min,10)
+	Minimum(1,BattV,IEEE4,0,False)
+	Sample(1,PanelT,IEEE4)
+	Average(1,TargetmV,IEEE4,False)
+	Average(1,DetectorTC,IEEE4,False)
+  Average(1,TargetTC,IEEE4,False)
+EndTable
+
+'Main Program
+BeginProg
+  'Declare Calibration Coefficients (sensor-specific)
+mC2 = 70034.5
+mC1 = 8157240
+mC0 = 1483180000
+bC2 = 6506.89
+bC1 = 127151
+bC0 = -7267410
+
+	Scan(1,Sec,0,0)
+		Battery(BattV)
+		PanelTemp(PanelT,_60Hz)
+		
+    'Measure Surface Temperature
+    Therm109(DetectorTC,1,1,Vx1,0,_60Hz,1.0,0)
+		VoltDiff(TargetmV,1, AutoRange, 2,True,0,_60Hz,1.0,0)
+		
+		m = mC2 * DetectorTC^2 + mC1 * DetectorTC + mC0
+		b = bC2 * DetectorTC^2 + bC1 * DetectorTC + bC0
+		
+		DetectorTK = DetectorTC + 273.15
+		TargetTK = ((DetectorTK^4) + m * TargetmV + b)^0.25
+		TargetTC = TargetTK - 273.15
+
+    'Call Output Tables
+		CallTable SurfaceT
+	NextScan
+EndProg
+
