@@ -19,8 +19,9 @@ Public CO2Sensor  As Float
 Public H2O As Float
 Public Flowrate As Float
 Public H20sensortmeperature As Float
-Public RawLine As String * 201
+Public RawLine As String * 300
 Public Field(9) As String * 10
+Public NBytes As Integer
 
 DataTable (gas_concentrations, 1, -1)
   DataInterval (0, 5, Sec, 10)
@@ -37,24 +38,25 @@ BeginProg
   'SerialOut(comC1, "S,1,4" + CHR(13), "+", 2, 0.1)
   'SerialOut(comC1, "S,11,1" + CHR(13), "+", 2, 0.1)
 
-  Scan (400, mSec, 3, 0)
+  Scan (5, sec, 3, 0)
     PanelTemp (PTemp, 15000)
     Battery (Batt_volt)
-    SerialIn(RawLine, comC1, 0, CHR(13), 200)
-    SplitStr (Field, RawLine, ",", 9, 5)
-
-    If Field(1) = "M2" Then
-        CO2Sensor = Field(2)
-        H2O = Field(3)
-        Flowrate = Field(5)
-        H20sensortmeperature = Field(7)
+    SerialInRecord(comC1, RawLine, "M2", 0, CHR(13), NBytes, 11)
+    
+    If Field(1) <> NAN Then
+      SplitStr (Field, RawLine, ",", 9, 5)
+      CO2Sensor = Field(2)
+      H2O = Field(3)
+      Flowrate = Field(5)
+      H20sensortmeperature = Field(7)
+    Else 
+      CO2Sensor = NAN
+      H2O = NAN
+      Flowrate = NAN
+      H20sensortemperature = NAN
     EndIf
 
     CallTable gas_concentrations
-    CO2Sensor = NAN
-    H2O = NAN
-    Flowrate = NAN
-    H20sensortemperature = NAN
 
     NextScan
 EndProg
