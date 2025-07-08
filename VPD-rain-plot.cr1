@@ -1,4 +1,4 @@
-'T-FACE CR1000 Series Datalogger Program
+' T-FACE CR1000 Series Datalogger Program
 ' Creation date: 2018-06-01
 ' Last update: 2025-03-28 - JAM
 ' program authors:  Carl Bernacchi - primary
@@ -13,16 +13,16 @@
 '  There are two total files - one for T-FACE and one for all raw variables.
 
 
-'SDM-CV04 C1 connected to C1 on CR3000, C2 to C2, C3 to C3
+' SDM-CV04 C1 connected to C1 on CR3000, C2 to C2, C3 to C3
 ' Out1 to Dimmer 1.
 ' If additional reps are added in future, then Out2 to Dimmer 2, Out3 to Dimmer 3.
 ' Out4 to Dimmer 4. Additional SDM-CV04s can also be added.
 
-'Note: The SDM-CV04 needs to be in Voltage Mode and the default as it comes from the
-'      factory is Current Mode. Jumpers need to be changed to switch to voltage mode.
-'      The first SDM-CV04 needs to have factory default address 0.
-'      Another jumper also needes to be changed to set the address of a second
-'      SDM-CV04 to be address 1.
+' Note: The SDM-CV04 needs to be in Voltage Mode and the default as it comes from the
+'       factory is Current Mode. Jumpers need to be changed to switch to voltage mode.
+'       The first SDM-CV04 needs to have factory default address 0.
+'       Another jumper also needes to be changed to set the address of a second
+'       SDM-CV04 to be address 1.
 '
 
 ' EKM Omnimeter 1 v.3 pin 14 connected to CR1000X pin P2
@@ -51,16 +51,16 @@ Const h_bc0 = -5665510
 			
 					
 			
-'Below are constants for the control of the heater outputs.
+' Below are constants for the control of the heater outputs.
 Const twopi = 6.283185
 Const piov2 = 1.5708
 Const SB=5.67E-8
 Const MODE = -1
 
-'Declare Public Variables
+' Declare Public Variables
 Public Kp, Ki, Kd
 Public BattVolt,Pnl_Tmp
-Dim Nmbr_Htrs   'Number heaters per SDM-CV04 output (1000W Mor FTE)
+Dim Nmbr_Htrs                ' Number heaters per SDM-CV04 output (1000 W Mor FTE)
 Public Target
 Public T_Diffrns
 Public IxKi_sum
@@ -84,8 +84,8 @@ Public upper_lim, lower_lim, heatmanset, rainon
 Dim Eff, Maxrad
 
 ' Public variables for power metering using EKM Omnimeter I v.3
-'Public ekmMeterPulseCount
-'Public ekmMeterKWh
+' Public ekmMeterPulseCount
+' Public ekmMeterKWh
 
 Dim delta_t		 'need to set delta_t to execution interval
 Dim P_error, D_dMVovdt
@@ -94,27 +94,27 @@ Dim Kp_x_P, Kd_x_D, Sum_KpKdKi
 Dim r_m, h_m, r_b, h_b
 Dim PID_CR, Radjust, Th_Adjust, Rheater, Rreflect, R_IRT
 
-'These are if the RainDetector is located in this plot
+' These are if the RainDetector is located in this plot
 Public raindet
 Public rainctrl
 
-'Define Data Tables (these are the final stored programs)
+' Define Data Tables (these are the final stored programs)
 '  !!!!!!Note to change the name of all the files according to plot.
-'This table is for all the heater array raw variables
-DataTable (raw,True,-1) ' change based on plot
-  DataInterval(0,10,Min,-1)
-  Average (1,TbodyRC,IEEE4,0)
-  Average (1,TbodyHC,IEEE4,0)
-  Average (1,mV_tpileR,IEEE4,0)
-  Average (1,mV_tpileH,IEEE4,0)
-  Average (1,TadjH,IEEE4,0)
-  Sample  (1,Target,IEEE4)
-  Average (1,PID_out,IEEE4,0)
-  Average (1,PID_lmt,IEEE4,0)
-  Average (1,ScldOut,IEEE4,0)
-  Average (1,Pnl_Tmp,IEEE4,0)
-  Sample (1,heatmanset,IEEE4)
-  Average(1,rainon,FP2,0)
+' This table is for all the heater array raw variables
+DataTable (raw, True, -1) ' change based on plot
+  DataInterval(0, 10, Min, -1)
+  Average (1, TbodyRC, IEEE4, 0)
+  Average (1, TbodyHC, IEEE4, 0)
+  Average (1, mV_tpileR,IEEE4,0)
+  Average (1, mV_tpileH,IEEE4,0)
+  Average (1, TadjH,IEEE4,0)
+  Sample  (1, Target,IEEE4)
+  Average (1, PID_out,IEEE4, 0)
+  Average (1, PID_lmt,IEEE4, 0)
+  Average (1, ScldOut,IEEE4, 0)
+  Average (1, Pnl_Tmp,IEEE4, 0)
+  Sample (1, heatmanset, IEEE4)
+  Average(1, rainon, FP2, 0)
   'Totalize (1, ekmMeterPulseCount, UINT4, 0)
   'Sample (1, ekmMeterKWh, IEEE4)
 EndTable
@@ -201,6 +201,29 @@ Sub  CorrectRef
   'because it is assumed that these will be the same in the reference plot.
 EndSub
 
+
+
+Sub RainCount
+   
+    ReadIO(raindet, 8) ' This checks is there is a 5V signal coming into C4.
+      
+    ' If there is, it is raining. Only Necessary on Plot 5.
+    If raindet = 8 AND rainctrl =-1 Then
+      rainon =  -1
+    Else
+      rainon = 0
+    EndIf
+EndSub 
+
+Function IsAthena As Boolean
+  Status.StationName(1,1) = 26164
+EndFunction 
+
+Sub RainDetection
+  If IsAthena
+    Call RainCount
+  EndIf 
+EndSub 
 
 
 '****************************************************************************************
@@ -314,24 +337,15 @@ BeginProg
 
 
 
-    ScldOut(1) = PID_lmt*1000   'Scale from volts to mV
-    ScldOut(2) = PID_lmt*1000   'Scale from volts to mV
-    ScldOut(3) = PID_lmt*1000   'Scale from volts to mV
-    ScldOut(4) = PID_lmt*1000   'Scale from volts to mV
+    ScldOut(1) = PID_lmt * 1000   'Scale from volts to mV
+    ScldOut(2) = PID_lmt * 1000   'Scale from volts to mV
+    ScldOut(3) = PID_lmt * 1000   'Scale from volts to mV
+    ScldOut(4) = PID_lmt * 1000   'Scale from volts to mV
 
     '***********************************************************
-    SDMCVO4 (ScldOut(),4,0,10)'Send instruction to SDM-CV04s (mV,reps,SDMaddress,volts)
+    SDMCVO4 (ScldOut(), 4, 0, 10)'Send instruction to SDM-CV04s (mV,reps,SDMaddress,volts)
     '**********************************************************
-
-    ' This is the rain detector code.  It should be present in only one plot.
-    ReadIO(raindet, 8) ' This checks is there is a 5V signal coming into C4.
-    
-    ' If there is, it is raining. Only Necessary on Plot 5.
-        If raindet = 8 AND rainctrl =-1 Then
-          rainon =  -1
-        Else
-          rainon = 0
-        EndIf
+    Call RainDetection
 
     ' EKM Omnimeter read pulse count and convert to KW*H
     ' I know the conversion can be done in one step with PulseCount() but want both the raw count and the conversion
