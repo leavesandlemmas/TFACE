@@ -29,9 +29,10 @@
 ' EKM Omnimeter 1 v.3 pin 15 connected to CR1000X pin ground
 ' The Omnimeter sends 800 pulses per KWh
 
-
 ' Enter constants for the TFACE IRTs provided by Apogee.
+
 ' T-FACE Reference plot SN 1234
+
 Const r_mC2 = 133757
 Const r_mC1 = 11739300
 Const r_mC0 = 2138210000
@@ -41,6 +42,7 @@ Const r_bC0 = -35064200
 Const r_sn  = 1234
 
 ' T-FACE Heated plot SN 6184
+
 Const h_mC2 = 66863.6
 Const h_mC1 = 7707660
 Const h_mC0 = 1377880000
@@ -344,6 +346,3 @@ BeginProg
 
   NextScan
 EndProg
-
-
-  ¶                   
