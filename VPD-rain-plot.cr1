@@ -96,7 +96,7 @@ Dim PID_CR, Radjust, Th_Adjust, Rheater, Rreflect, R_IRT
 
 ' These are if the RainDetector is located in this plot
 Public raindet
-Public rainctrl
+Public rainctrl As Boolean
 
 ' Define Data Tables (these are the final stored programs)
 '  !!!!!!Note to change the name of all the files according to plot.
@@ -201,31 +201,6 @@ Sub  CorrectRef
   'because it is assumed that these will be the same in the reference plot.
 EndSub
 
-
-
-Sub RainCount
-   
-    ReadIO(raindet, 8) ' This checks is there is a 5V signal coming into C4.
-      
-    ' If there is, it is raining. Only Necessary on Plot 5.
-    If raindet = 8 AND rainctrl =-1 Then
-      rainon =  -1
-    Else
-      rainon = 0
-    EndIf
-EndSub 
-
-Function IsAthena As Boolean
-  Status.StationName(1,1) = 26164
-EndFunction 
-
-Sub RainDetection
-  If IsAthena
-    Call RainCount
-  EndIf 
-EndSub 
-
-
 '****************************************************************************************
 'Main Program
 BeginProg
@@ -254,8 +229,7 @@ BeginProg
   ' a time-space anomaly which would destroy the universe.  Maybe.
   delta_t=5		 'execution interval.  This must match with the 'Scan' interval below.
   ' This is if the rain detector is located in this plot.
-  rainctrl = -1
-
+  rainctrl = Status.StationName(1,1) = "26164"  ' True or False. Use the station name of the logger you want to use for rain control.
 
   PulseCountReset  ' This resets all pulse counts.  Not sure if it's needed, but whatever.
 
@@ -345,7 +319,10 @@ BeginProg
     '***********************************************************
     SDMCVO4 (ScldOut(), 4, 0, 10)'Send instruction to SDM-CV04s (mV,reps,SDMaddress,volts)
     '**********************************************************
-    Call RainDetection
+    If rainctrl Then
+        ReadIO(raindet, 8)  ' byte flag. This checks is there is a 5 V signal coming into C4. The value returned by ReadIO is a byte flag, and the fourth bit is one (decimal value of 8) if C4 is high.
+        rainon = raindet = 8  ' True or False. If that bit high, it's raining.
+    EndIf
 
     ' EKM Omnimeter read pulse count and convert to KW*H
     ' I know the conversion can be done in one step with PulseCount() but want both the raw count and the conversion
