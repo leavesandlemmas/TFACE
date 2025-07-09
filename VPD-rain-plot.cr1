@@ -80,7 +80,7 @@ Dim TtarHK
 Public TtarHC
 Public Wind
 Dim cons_m, cons_b, 
-Public upper_lim, lower_lim, heatmanset, rainon
+Public upper_lim, lower_lim, heatmanset, is_raining
 Dim Eff, Maxrad
 
 ' Public variables for power metering using EKM Omnimeter I v.3
@@ -114,7 +114,7 @@ DataTable (raw, True, -1) ' change based on plot
   Average (1, ScldOut,IEEE4, 0)
   Average (1, Pnl_Tmp,IEEE4, 0)
   Sample (1, heatmanset, IEEE4)
-  Average(1, rainon, FP2, 0)
+  Average(1, is_raining, FP2, 0)
   'Totalize (1, ekmMeterPulseCount, UINT4, 0)
   'Sample (1, ekmMeterKWh, IEEE4)
 EndTable
@@ -146,7 +146,7 @@ DataTable (Control,True,-1)				' change based on plot
   Average (1,T_Diffrns,IEEE4,0)
   Sample  (1,Target,IEEE4)
   Average (1,ScldOut,IEEE4,0)
-  Average (1,rainon,IEEE4,0)
+  Average (1,is_raining,IEEE4,0)
 EndTable
 
 
@@ -230,7 +230,7 @@ BeginProg
   delta_t=5		 'execution interval.  This must match with the 'Scan' interval below.
   ' This is if the rain detector is located in this plot.
   rainctrl = Status.StationName(1,1) = "26164"  ' True or False. Use the station name of the logger you want to use for rain control.
-  rainon = True  ' Start with the assumption that it's raining, and in the first scan it will get the correct value.
+  is_raining = True  ' Start with the assumption that it's raining, and in the first scan it will get the correct value.
 
   PulseCountReset  ' This resets all pulse counts.  Not sure if it's needed, but whatever.
 
@@ -297,7 +297,7 @@ BeginProg
     If heatmanset < 0 Then
       'Set maximum temperature in the heated plot - presently same threshold for both experiments
 
-      If TtarHC > 42 OR rainon Then
+      If TtarHC > 42 OR is_raining Then
 
         PID_lmt = lower_lim
       Else
@@ -322,7 +322,7 @@ BeginProg
     '**********************************************************
     If rainctrl Then
         ReadIO(raindet, 8)  ' byte flag. This checks is there is a 5 V signal coming into C4. The value returned by ReadIO is a byte flag, and the fourth bit is one (decimal value of 8) if C4 is high.
-        rainon = raindet = 8  ' True or False. If that bit high, it's raining.
+        is_raining = raindet = 8  ' True or False. If that bit high, it's raining.
     EndIf
 
     ' EKM Omnimeter read pulse count and convert to KW*H
