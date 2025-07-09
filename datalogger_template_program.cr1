@@ -161,20 +161,19 @@ Function ComputeTargetTemp(temp_c, thermopile_volt, coef(2,3))
 EndFunction 
 
 Sub ParseLine (coef(2, 3), Line, Success)
-    Dim i, j
-    For i = 1 To 2  
-        For j = 1 To 3
-            coef(i, j) = nan 
-        Next j 
-    Next i
-    
-    SplitStr(coef(), Line, ",", 6, 0)
+    Dim i, j, k
+    Dim result(6)
+
+    result() = nan   
+    SplitStr(result(), Line, ",", 6, 0)
 
     For i = 1 To 2
         For j = 1 To 3
-            If coef(i, j) = nan Then 
-                Success = False 
-            EndIf
+          k = 3 * ( i - 1 ) + j
+          If result(k) = nan Then
+            Success = False  
+          Else 
+            coef(i, j) = result(k)
         Next j
     Next i
 EndSub 
@@ -185,16 +184,18 @@ Public LostConnection As Boolean = False
 
 
 ' READ IRR PARAM FILE 
-Public irr_param_file_success As Boolean = False 
+Public irr_param_file_success As Boolean = False
+Public file_open_successful As Boolean = False 
 Public last_modified_time As Long
  
 Sub LoadIrrParam(last_time, r_coef(2,3), h_coef(2,3))
   Dim Line As String * 100
   Dim FileHandle
-  Dim Successful = True 
+  Dim Successful As Boolean  
 
   FileHandle = FileOpen("CPU:input_irr_params.txt", "r", 0)
   Successful = (FileHandle <> 0)
+  file_open_successful = Successful
   If Successful Then
     last_time = FileTime(FileHandle)
     ' Read first row into r_coef
@@ -386,11 +387,8 @@ BeginProg
 
 
 
-    ScldOut(1) = PID_lmt * 1000   ' Scale from volts to mV
-    ScldOut(2) = PID_lmt * 1000   ' Scale from volts to mV
-    ScldOut(3) = PID_lmt * 1000   ' Scale from volts to mV
-    ScldOut(4) = PID_lmt * 1000   ' Scale from volts to mV
-
+    ScldOut() = PID_lmt * 1000   ' Scale from volts to mV
+    
     '***********************************************************
     SDMCVO4 (ScldOut(), 4, 0, 10)' Send instruction to SDM-CV04s (mV, reps, SDMaddress, volts)
     '**********************************************************
