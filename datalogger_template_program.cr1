@@ -1,0 +1,434 @@
+' T-FACE CR1000 Series Datalogger Program
+' Creation date: 2018-06-01
+' Last update: 2025-03-28 - JAM
+' program authors:  Carl Bernacchi - primary
+'                   Chris Montes - modifications
+'                   Jesse McGrath - EKM Omnimeter metering code
+
+
+'  This program will operate the T-FACE Experiment.
+
+'  All IRRs will be read continuously and stored into separate files.
+
+'  There are two total files - one for T-FACE and one for all raw variables.
+
+
+' SDM-CV04 C1 connected to C1 on CR3000, C2 to C2, C3 to C3
+' Out1 to Dimmer 1.
+' If additional reps are added in future, then Out2 to Dimmer 2, Out3 to Dimmer 3.
+' Out4 to Dimmer 4. Additional SDM-CV04s can also be added.
+
+' Note: The SDM-CV04 needs to be in Voltage Mode and the default as it comes from the
+'       factory is Current Mode. Jumpers need to be changed to switch to voltage mode.
+'       The first SDM-CV04 needs to have factory default address 0.
+'       Another jumper also needes to be changed to set the address of a second
+'       SDM-CV04 to be address 1.
+'
+
+' EKM Omnimeter 1 v.3 pin 14 connected to CR1000X pin P2
+' EKM Omnimeter 1 v.3 pin 15 connected to CR1000X pin ground
+' The Omnimeter sends 800 pulses per KWh
+
+' Enter constants for the TFACE IRTs provided by Apogee.
+' T-FACE Reference plot SN 1172
+Public r_coef(2, 3) = {101848, 8398310, 1470590000, 7563.48, -11293.4, -3885300}
+Const r_sn = 1172
+
+' T-FACE Heated plot SN 1970
+Public h_coef(2, 3) = {115646, 11052800, 1936590000, 3652.01, 111740, -15882800}
+Const h_sn = 1970
+
+' Below are constants for the control of the heater outputs.
+Const twopi = 6.283185
+Const piov2 = 1.5708
+Const SB = 5.67E-8
+Const MODE = -1
+
+' Declare Public Variables
+Public Kp, Ki, Kd
+Public BattVolt, Pnl_Tmp
+Dim Nmbr_Htrs                ' Number heaters per SDM-CV04 output (1000 W Mor FTE)
+Public Target
+Public T_Diffrns
+Public IxKi_sum
+Dim PID_out, PID_lmt,
+Public ScldOut(4)
+Dim T_correct
+Public TadjH
+Public mV_tpileR
+Public TbodyRC
+Public TtarRC
+Public mV_tpileH
+Public TbodyHC
+Public TtarHC
+Public Wind
+Dim cons_m, cons_b, 
+Public upper_lim, lower_lim, heatmanset
+Dim Eff, Maxrad
+
+
+Dim delta_t            ' Need to set delta_t to execution interval
+Dim P_error, D_dMVovdt
+Dim Prev_Meas, Prev_Err
+Dim Kp_x_P, Kd_x_D, Sum_KpKdKi
+Dim PID_CR, Radjust, Th_Adjust, Rheater, Rreflect, R_IRT
+
+Function OnlyIfStationNameIs (station_name As String) As Boolean
+  Return Status.StationName(1,1) = station_name
+EndFunction 
+
+' RainDetector Variables & Code
+Public is_raining As Boolean = True  ' Start with the assumption that it's raining, and in the first scan it will get the correct value.
+Public is_rain_control As Boolean
+Public rain_byte_flag
+
+Sub CheckIfRaining
+  If is_rain_control Then
+    ReadIO(rain_byte_flag, 8)  ' byte flag. This checks is there is a 5 V signal coming into C4. The value returned by ReadIO is a byte flag, and the fourth bit is one (decimal value of 8) if C4 is high.
+    is_raining = (rain_byte_flag = 8)  ' True or False. If that bit high, it's raining.
+  EndIf
+EndSub
+
+' Public variables for power metering using EKM Omnimeter I v.3
+Public ekmMeterPulseCount = 0
+Public ekmMeterKWh = nan
+Public has_ekm_meter As Boolean = False 
+
+
+'  Subroutine to compute PID output control signal
+'  Original version written with EDLOG by Tony Wahl from Campbell Scientific
+Sub PIRcontrol
+  ' First set
+  P_error = T_Diffrns - Target                    ' PROPORTIONAL
+  Kp_x_P = P_error * Kp
+
+  D_dMVovdt = (T_Diffrns - Prev_Meas) / delta_t   ' DERIVATIVE
+  Kd_x_D = Kd * D_dMVovdt
+
+  Prev_Err = (Prev_Err + P_error) / 2  ' Average error  INTEGRAL
+  Prev_Err = Prev_Err * delta_t
+  Prev_Err = Prev_Err * Ki            ' Next Ki increment
+  IxKi_sum = IxKi_sum + Prev_Err    ' I = integral of error
+  Sum_KpKdKi = Kp_x_P + Kd_x_D + IxKi_sum
+  PID_out = Kp_x_P + Kd_x_D + IxKi_sum
+  PID_out = PID_out * MODE         ' Change sign according to +/- mode
+  Prev_Meas = T_Diffrns            ' Shift measured to Prev_meas for next time step
+  Prev_Err = T_Diffrns - Target    ' Store previous error to get ready for next time step
+
+EndSub
+
+
+'  Adjust the apparent temperature in the heated plot for radiation reflected
+'  from the heaters.
+Sub CorrectRef
+  ' Assume: fraction of thermal energy emitted by heater in the 8 to 14 um band
+  '        sensed by Apogee IRR-P is 0.14 for heater at 600 degrees C.
+  '        Multiply by 0.9 for window transmittance > 0.13.
+
+  ' Assume: fraction of thermal energy emitted by canopy in the 8 to 14 um band
+  '        sensed by Apogee IRR-P5 is 0.37 as per canopy at 20 degrees C.
+  '        Multipy by 0.9 for window transmittance > 0.33.
+
+  ' Assume: emissivity of plant canopy = 0.98
+
+  Eff = 10 + 25 * EXP(-0.17 * Wind)  ' Compute efficiency of heater system (%) from wind (m/s)
+  Maxrad = Nmbr_Htrs * 1000 * (Eff / 100) / 7.07 ' Compute max down rad over 7.07 m^2 plot
+  Rheater = Maxrad * (PID_CR / 10)^2 ' Scale in proportion to the square of the
+                                     ' last value of PID control, so that have full
+                                     ' correction when heaters fully on and no correction
+                                     ' when heaters off.
+  Rreflect = Rheater * (1 - 0.98) * 0.13              ' Calculate radiation from heater reflected by canopy
+                                                      ' in 8-14 um band.
+  R_IRT = 0.33 * SB * (T_correct + 273.15)^4          ' Calculate amount of energy sensed by IRT
+  Radjust  = R_IRT - Rreflect                         ' Subtract the rediation from the heater
+  Th_Adjust = ((Radjust / (SB * 0.33))^0.25) - 273.15 ' Calculate temperature from the radiation
+
+  ' Note: No adjustment for canopy emmissivity and reflected sky radiation are being
+  ' because it is assumed that these will be the same in the reference plot.
+EndSub
+
+Function ComputeTargetTemp(temp_c, thermopile_volt, coef(2,3))
+    Dim m, b, par, temp_kelvin
+    ' Calculation of m (slope) and b (intercept) coefficients for target temperature calculation
+    m = (coef(1,1) * temp_c + coef(1,2)) * temp_c + coef(1,3)
+    b = (coef(2,1) * temp_c + coef(2,2)) * temp_c + coef(2,3)
+    
+    ' Calculation of target temperature
+    par = m * thermopile_volt + b 
+    temp_kelvin = temp_c + 273.15
+
+    Return ((temp_kelvin^4 + par) ^ 0.25  - 273.15)
+EndFunction 
+
+Sub ParseLine (coef(2, 3), Line, Success)
+    Dim i, j
+    For i = 1 To 2  
+        For j = 1 To 3
+            coef(i, j) = nan 
+        Next j 
+    Next i
+    
+    SplitStr(coef(), Line, ",", 6, 0)
+
+    For i = 1 To 2
+        For j = 1 To 3
+            If coef(i, j) = nan Then 
+                Success = False 
+            EndIf
+        Next j
+    Next i
+EndSub 
+
+'Network Connection Variables
+Public PingResult = 0
+Public LostConnection As Boolean = False 
+
+
+' READ IRR PARAM FILE 
+Public irr_param_file_success As Boolean = False 
+Public last_modified_time As Long
+ 
+Sub LoadIrrParam(last_time, r_coef(2,3), h_coef(2,3))
+  Dim Line As String * 100
+  Dim FileHandle
+  Dim Successful = True 
+
+  FileHandle = FileOpen("CPU:input_irr_params.txt", "r", 0)
+  Successful = (FileHandle <> 0)
+  If Successful Then
+    last_time = FileTime(FileHandle)
+    ' Read first row into r_coef
+    FileReadLine(FileHandle, Line, 100)
+    Call ParseLine(r_coef(), Line, Successful)
+    
+
+    ' Read second row into h_coef
+    FileReadLine(FileHandle, Line, 100)
+    Call ParseLine(h_coef(), Line, Successful)
+
+    FileClose(FileHandle)
+    irr_param_file_success = True
+  EndIf 
+
+  If Successful <> True Then  
+    irr_param_file_success = False 
+    heatmanset = 0
+    
+    ' use defaults
+    r_coef(1,1) = 101848
+    r_coef(1,2) = 8398310
+    r_coef(1,3) = 1470590000
+    r_coef(2,1) = 7563.48
+    r_coef(2,2) = -11293.4
+    r_coef(2,3) = -3885300
+
+    h_coef(1,1) = 115646
+    h_coef(1,2) = 11052800
+    h_coef(1,3) = 1936590000
+    h_coef(2,1) = 3652.01
+    h_coef(2,2) = 111740
+    h_coef(2,3) = -15882800 
+  EndIf
+EndSub
+
+Sub CheckForIrrParamUpdate (last_time, r_coef, h_coef)
+    Dim current_time As Long
+    Dim timeStampChanged As Boolean 
+    
+    current_time = FileTime("CPU:input_irr_params.txt")
+    timeStampChanged = current_time <> last_time
+    If timeStampChanged Then
+        LoadIrrParam(last_time, r_coef, h_coef)
+        last_time = current_time
+    EndIf
+EndSub  
+
+' Define Data Tables (these are the final stored programs)
+'  !!!!!!Note to change the name of all the files according to plot.
+' This table is for all the heater array raw variables
+DataTable (raw, True, -1)           ' Change based on plot
+  DataInterval(0, 10, Min, -1)
+  Average (1, TbodyRC, IEEE4, 0)
+  Average (1, TbodyHC, IEEE4, 0)
+  Average (1, mV_tpileR, IEEE4, 0)
+  Average (1, mV_tpileH, IEEE4, 0)
+  Average (1, TadjH, IEEE4, 0)
+  Sample  (1, Target, IEEE4)
+  Average (1, PID_out, IEEE4, 0)
+  Average (1, PID_lmt, IEEE4, 0)
+  Average (1, ScldOut, IEEE4, 0)
+  Average (1, Pnl_Tmp, IEEE4, 0)
+  Sample (1, heatmanset, IEEE4)
+  Average (1, is_raining, FP2, 0)
+  Totalize (1, ekmMeterPulseCount, UINT4, 0)
+  Sample (1, ekmMeterKWh, IEEE4)
+  Sample (1, irr_param_file_success, Boolean, 0)
+  Average (1, LostConnection, FP2, 0)
+EndTable
+
+DataTable(irr_params, True, -1)
+  ' TableFile("CPU:" + Status.SerialNumber + "_param_log", 8, -1, 0, 0, Hr, 0, 0) 
+  Sample(6, r_coef, IEEE4)
+  Sample(1, r_sn,  UINT2)
+  Sample(6, h_coef, IEEE4)
+  Sample(1, h_sn,  UINT2)
+EndTable
+
+'  This Table is for the T-FACE critical variables.
+DataTable (Control, True, -1)       ' Change based on plot
+  DataInterval(0, 10, Min, -1)
+  Average (1, TtarRC, IEEE4, 0)
+  Average (1, TtarHC, IEEE4, 0)
+  Average (1, TadjH, IEEE4, 0)
+  Average (1, T_Diffrns, IEEE4, 0)
+  Sample  (1, Target, IEEE4)
+  Average (1, ScldOut, IEEE4, 0)
+  Average (1, is_raining, FP2, 0)
+EndTable
+
+
+
+'****************************************************************************************
+' Main Program
+BeginProg
+    Call LoadIrrParam(last_modified_time, r_coef, h_coef)
+    Scan(1, sec, 0, 1)  ' Log the IRR parameters only once, at the start of the program.
+        CallTable irr_params
+        ExitScan
+    NextScan
+  ' The following are constants for this experiment.  They represent the defaults by can be
+  ' changed real-time when the program is running.  Because these are all placed before the
+  ' 'Scan' command (below) they are set when the program first compiles and then not again.
+  ' This means you can change them from the default when the programm is running without having
+  ' to recompile the program.  They can be changed via a 'connected' datalogger (from the graphs
+  ' or Num Display options when connected.
+
+  Nmbr_Htrs = 24   ' Number of Mor FTE heaters (1000W)
+  Target = 2.5     ' Temperature rise (degrees C) of heated plot in T-FACE above reference plot in daytime
+  Kp = 50          ' Tuning constants
+  Ki = 0.5
+  Kd = 5
+  cons_m = 0.03
+  cons_b = 2.5
+  upper_lim = 10   ' This is the upper limit of the heaters.  Max is 10.
+  lower_lim = 3.5  ' This is the lowest output value of the heaters.  Lowest is 0
+  heatmanset = 0   ' This is the manual control option.  -1 means automatic control.  0-10 is
+                   ' the scaled output from 0 to 10.  Anything other then -1 to 10 will create
+                   ' a time-space anomaly which would destroy the universe.  Maybe.
+  delta_t = 5      ' Execution interval.  This must match with the 'Scan' interval below.
+
+  is_rain_control = OnlyIfStationNameIs("26164")  ' True or False. Use the station name of the logger you want to use for rain control.
+  has_ekm_meter = OnlyIfStationNameIs("24242")
+
+  PulseCountReset  ' This resets all pulse counts.  Not sure if it's needed, but whatever.
+
+  Scan (5, Sec, 0, 0)
+
+
+    PanelTemp (Pnl_Tmp, _60Hz) ' This is the data logger temperature
+    Battery (BattVolt)         ' This tells us the voltage of the battery powering the data logger.
+    PulseCount (Wind, 1, 1, 0, 1, 0.09462, 0.2) ' This is for an optional wind speed sensor, which
+                                                ' can be used to determine heater efficiency.
+
+    ' This section will collect the IRR measurements from the T-FACE IRRs (both ref and heated).
+
+    ' *******T-FACE***********
+    ' Measure thermopile voltages of T-FACE Reference IRTs
+    VoltDiff(mV_tpileR, 1, mV7_5, 1, True , 0, _60Hz, 1.0, 0) ' Diff channel 1
+    ' Measure ratios Vx/Vb of body thermistors of Reference IRTs
+    Therm109(TbodyRC, 1, 5, Vx1, 0, _60Hz, 1.0, 0) ' SE channel 5
+    TtarRC = ComputeTargetTemp(TbodyRC, mV_tpileR, r_coef)
+
+    ' For Heated Plots
+    ' Measure thermopile voltages of T-FACE Heated IRTs
+    VoltDiff (mV_tpileH, 1, mV7_5C, 2, True , 0, _60Hz, 1.0, 0)
+    ' Measure ratios Vx/Vb of body thermistors of Heated IRTs
+    Therm109 (TbodyHC, 1, 6, Vx1, 0, _60Hz, 1.0, 0)
+    TtarHC = ComputeTargetTemp(TbodyHC, mV_tpileH, h_coef)
+
+
+    '*******************************************************
+    ' Do an adjustment of the temperature in the heated plot for thermal radiation
+    ' from the heaters that is reflected from the crop canopy to the IRT
+    T_correct = TtarHC
+    PID_CR = PID_lmt
+    Call CorrectRef
+    TadjH = Th_Adjust
+
+    ' Compute temperature differnce between heated and control plots
+    T_Diffrns = TadjH-TtarRC
+
+    Call PIRcontrol    ' Compute PID control signal
+
+
+    PID_lmt = PID_out
+    PID_lmt = PID_lmt * cons_m + cons_b
+
+    If PID_lmt < lower_lim Then PID_lmt = lower_lim  ' Set lower limit
+    If PID_lmt > upper_lim Then PID_lmt = upper_lim  ' Set upper limit
+
+    If heatmanset < 0 Then
+      ' Set maximum temperature in the heated plot - presently same threshold for both experiments
+
+      If TtarHC > 42 OR is_raining Then
+
+        PID_lmt = lower_lim
+      Else
+        PID_lmt = PID_lmt
+      EndIf
+    Else
+      PID_lmt = heatmanset
+    EndIf
+
+    ' Set maximum temperature difference - different for each experiment
+     If T_Diffrns > Target + 2 Then IxKi_sum = 0
+
+
+
+
+    ScldOut(1) = PID_lmt * 1000   ' Scale from volts to mV
+    ScldOut(2) = PID_lmt * 1000   ' Scale from volts to mV
+    ScldOut(3) = PID_lmt * 1000   ' Scale from volts to mV
+    ScldOut(4) = PID_lmt * 1000   ' Scale from volts to mV
+
+    '***********************************************************
+    SDMCVO4 (ScldOut(), 4, 0, 10)' Send instruction to SDM-CV04s (mV, reps, SDMaddress, volts)
+    '**********************************************************
+
+    Call CheckIfRaining
+
+    ' EKM Omnimeter read pulse count and convert to KW*H
+    ' I know the conversion can be done in one step with PulseCount() but want both the raw count and the conversion
+    PulseCount(ekmMeterPulseCount, 1, 2, 1, 0, 1, 0)
+    If has_ekm_meter Then 
+      ekmMeterKWh = ekmMeterPulseCount / 800
+    EndIf
+
+    CallTable raw      ' Change based on plot
+    CallTable control  ' Change based on plot
+
+  NextScan
+
+  
+  SlowSequence
+    Scan(600, Sec, 0, 0)
+      ' Check if irr params should be updated
+      Call CheckForIrrParamUpdate(last_modified_time, r_coef, h_coef)
+
+      ' The loggers often lose network connection and the wireless hardware needs to be restarted.
+      ' This periodically checks whether there's a newtwork connection and if not it turns off
+      ' the 12 V connection that powers the wireless controller.
+  
+      PingResult = PingIP("192.168.1.95", 2000)
+      
+      If PingResult = 0 Then
+        LostConnection = True
+        SW12(False)
+        Delay(1, 10, sec)
+        SW12(True)
+      Else
+        LostConnection = False 
+      EndIf
+    NextScan
+  EndSequence
+EndProg
