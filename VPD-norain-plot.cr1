@@ -84,8 +84,9 @@ Public upper_lim, lower_lim, heatmanset, rainon
 Dim Eff, Maxrad
 
 ' Public variables for power metering using EKM Omnimeter I v.3
-Public ekmMeterPulseCount
-Public ekmMeterKWh
+Public ekmMeterPulseCount As Long 
+Public ekmMeterKWh = nan 
+Public has_ekm_meter As Boolean
 
 Dim delta_t            ' Need to set delta_t to execution interval
 Dim P_error, D_dMVovdt
@@ -94,9 +95,11 @@ Dim Kp_x_P, Kd_x_D, Sum_KpKdKi
 Dim r_m, h_m, r_b, h_b
 Dim PID_CR, Radjust, Th_Adjust, Rheater, Rreflect, R_IRT
 
-' These are if the RainDetector is located in this plot
-' Public raindet
-' Public rainctrl
+' RainDetector Variables & Code
+Public is_raining As Boolean = True  ' Start with the assumption that it's raining, and in the first scan it will get the correct value.
+Public is_rain_control As Boolean
+Dim rain_byte_flag
+
 
 ' Define Data Tables (these are the final stored programs)
 '  !!!!!!Note to change the name of all the files according to plot.
@@ -114,7 +117,7 @@ DataTable (raw, True, -1)           ' Change based on plot
   Average (1, ScldOut, IEEE4, 0)
   Average (1, Pnl_Tmp, IEEE4, 0)
   Sample (1, heatmanset, IEEE4)
-  Average (1, rainon, FP2, 0)
+  Average (1, is_raining, FP2, 0)
   Totalize (1, ekmMeterPulseCount, UINT4, 0)
   Sample (1, ekmMeterKWh, IEEE4)
 EndTable
@@ -146,7 +149,7 @@ DataTable (Control, True, -1)       ' Change based on plot
   Average (1, T_Diffrns, IEEE4, 0)
   Sample  (1, Target, IEEE4)
   Average (1, ScldOut, IEEE4, 0)
-  Average (1, rainon, IEEE4, 0)
+  Average (1, is_raining, IEEE4, 0)
 EndTable
 
 
@@ -232,9 +235,8 @@ BeginProg
                    ' a time-space anomaly which would destroy the universe.  Maybe.
   delta_t = 5      ' Execution interval.  This must match with the 'Scan' interval below.
 
-  ' This is if the rain detector is located in this plot.
-  ' rainctrl = -1
-
+  is_rain_control = (Status.StationName(1,1) = "26164")
+  has_ekm_meter = (Status.StationName(1,1) = "24242") ' Aphrodite'
 
   PulseCountReset  ' This resets all pulse counts.  Not sure if it's needed, but whatever.
 
@@ -301,7 +303,7 @@ BeginProg
     If heatmanset < 0 Then
       ' Set maximum temperature in the heated plot - presently same threshold for both experiments
 
-      If TtarHC > 42 OR rainon = -1 Then
+      If TtarHC > 42 OR is_raining Then
 
         PID_lmt = lower_lim
       Else
@@ -323,22 +325,21 @@ BeginProg
     ScldOut(4) = PID_lmt * 1000   ' Scale from volts to mV
 
     '***********************************************************
-    SDMCVO4 (ScldOut(), 4, 0, 10)' Send instruction to SDM-CV04s (mV, reps, SDMaddress, volts)
+    SDMCVO4 (ScldOut(), 4, 0, 10)  ' Send instruction to SDM-CV04s (mV, reps, SDMaddress, volts).
     '**********************************************************
 
-    ' This is the rain detector code.  It should be present in only one plot.
-    ' ReadIO(raindet, 8) ' This checks is there is a 5V signal coming into C4.
-    ' If there is, it is raining. Only Necessary on Plot 5.
-    '    If raindet = 8 AND rainctrl =-1 Then
-    '      rainon =  -1
-    '    Else
-    '      rainon = 0
-    '    EndIf
+    ' This is the rain detector code.  
+    If is_rain_control Then
+      ReadIO(rain_byte_flag, 8)  ' byte flag. This checks is there is a 5 V signal coming into C4. The value returned by ReadIO is a byte flag, and the fourth bit is one (decimal value of 8) if C4 is high.
+      is_raining = (rain_byte_flag = 8)  ' True or False. If that bit is high, it's raining.
+    EndIf
 
-    ' EKM Omnimeter read pulse count and convert to KW*H
-    ' I know the conversion can be done in one step with PulseCount() but want both the raw count and the conversion
+    ' Read EKM Omnimeter pulse count and it convert to KW*H.
+    ' I know the conversion can be done in one step with PulseCount() but want both the count and the conversion.
     PulseCount(ekmMeterPulseCount, 1, 2, 1, 0, 1, 0)
-    ekmMeterKWh = ekmMeterPulseCount / 800
+    If has_ekm_meter Then 
+      ekmMeterKWh = ekmMeterPulseCount / 800
+    EndIf
 
 
     CallTable raw      ' Change based on plot
