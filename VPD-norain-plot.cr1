@@ -325,17 +325,17 @@ BeginProg
     ScldOut(4) = PID_lmt * 1000   ' Scale from volts to mV
 
     '***********************************************************
-    SDMCVO4 (ScldOut(), 4, 0, 10)' Send instruction to SDM-CV04s (mV, reps, SDMaddress, volts)
+    SDMCVO4 (ScldOut(), 4, 0, 10)  ' Send instruction to SDM-CV04s (mV, reps, SDMaddress, volts).
     '**********************************************************
 
     ' This is the rain detector code.  
     If is_rain_control Then
       ReadIO(rain_byte_flag, 8)  ' byte flag. This checks is there is a 5 V signal coming into C4. The value returned by ReadIO is a byte flag, and the fourth bit is one (decimal value of 8) if C4 is high.
-      is_raining = (rain_byte_flag = 8)  ' True or False. If that bit high, it's raining.
+      is_raining = (rain_byte_flag = 8)  ' True or False. If that bit is high, it's raining.
     EndIf
 
-    ' EKM Omnimeter read pulse count and convert to KW*H
-    ' I know the conversion can be done in one step with PulseCount() but want both the raw count and the conversion
+    ' Read EKM Omnimeter pulse count and it convert to KW*H.
+    ' I know the conversion can be done in one step with PulseCount() but want both the count and the conversion.
     PulseCount(ekmMeterPulseCount, 1, 2, 1, 0, 1, 0)
     If has_ekm_meter Then 
       ekmMeterKWh = ekmMeterPulseCount / 800
