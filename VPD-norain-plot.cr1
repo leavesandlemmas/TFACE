@@ -80,7 +80,7 @@ Dim TtarHK
 Public TtarHC
 Public Wind
 Dim cons_m, cons_b, 
-Public upper_lim, lower_lim, heatmanset, rainon
+Public upper_lim, lower_lim, heatmanset
 Dim Eff, Maxrad
 
 Dim delta_t            ' Need to set delta_t to execution interval
@@ -91,7 +91,7 @@ Dim r_m, h_m, r_b, h_b
 Dim PID_CR, Radjust, Th_Adjust, Rheater, Rreflect, R_IRT
 
 ' Public variables for power metering using EKM Omnimeter I v.3
-Public ekmMeterPulseCount As Long 
+Public ekmMeterPulseCount
 Public ekmMeterKWh = nan 
 Public has_ekm_meter As Boolean
 
@@ -101,8 +101,6 @@ Public is_rain_control As Boolean
 Dim rain_byte_flag
 
 'Network Connection Variables
-Public PingResult As Long 
-Public LostConnection As Boolean = False 
 
 
 ' Define Data Tables (these are the final stored programs)
@@ -352,20 +350,17 @@ BeginProg
   NextScan
   
   SlowSequence
-    Scan(1200, Sec, 0, 0)
+    Scan(3600, Sec, 0, 0)
     
       ' The loggers often lose network connection and the wireless hardware needs to be restarted.
-      ' This periodically checks whether there's a newtwork connection and if not it turns off
+      ' this code disconnects the wireless controller periodically for Aphrodite.
       ' the 12 V connection that powers the wireless controller.
   
-      PingResult = PingIP("192.168.1.95", 2000)
-      
-      ' If PingResult = 0 Then
-       '' LostConnection = True
-       '' SW12(False)
-       '' Delay(1, 10, sec)
-      ''  SW12(True)
-      'EndIf
+      If (Status.StationName(1,1) == "24242") Then 
+        SW12(False)
+        Delay(1, 10, sec)
+        SW12(True)
+      EndIf
     NextScan
   EndSequence
 EndProg
