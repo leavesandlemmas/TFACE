@@ -73,21 +73,11 @@ Dim Prev_Meas, Prev_Err
 Dim Kp_x_P, Kd_x_D, Sum_KpKdKi
 Dim PID_CR, Radjust, Th_Adjust, Rheater, Rreflect, R_IRT
 
-Function OnlyIfStationNameIs (station_name As String) As Boolean
-  Return Status.StationName(1,1) = station_name
-EndFunction 
-
 ' RainDetector Variables & Code
 Public is_raining As Boolean = True  ' Start with the assumption that it's raining, and in the first scan it will get the correct value.
 Public is_rain_control As Boolean
 Public rain_byte_flag
 
-Sub CheckIfRaining
-  If is_rain_control Then
-    ReadIO(rain_byte_flag, 8)  ' byte flag. This checks is there is a 5 V signal coming into C4. The value returned by ReadIO is a byte flag, and the fourth bit is one (decimal value of 8) if C4 is high.
-    is_raining = (rain_byte_flag = 8)  ' True or False. If that bit high, it's raining.
-  EndIf
-EndSub
 
 ' Public variables for power metering using EKM Omnimeter I v.3
 Public ekmMeterPulseCount = 0
@@ -147,35 +137,10 @@ Sub CorrectRef
   ' because it is assumed that these will be the same in the reference plot.
 EndSub
 
-Function ComputeTargetTemp(temp_c, thermopile_volt, coef(2,3))
-    Dim m, b, par, temp_kelvin
-    ' Calculation of m (slope) and b (intercept) coefficients for target temperature calculation
-    m = (coef(1,1) * temp_c + coef(1,2)) * temp_c + coef(1,3)
-    b = (coef(2,1) * temp_c + coef(2,2)) * temp_c + coef(2,3)
-    
-    ' Calculation of target temperature
-    par = m * thermopile_volt + b 
-    temp_kelvin = temp_c + 273.15
 
-    Return ((temp_kelvin^4 + par) ^ 0.25  - 273.15)
-EndFunction 
 
 Sub ParseLine (coef(2, 3), Line, Success)
-    Dim i, j, k
-    Dim result(6)
-
-    result() = nan   
-    SplitStr(result(), Line, ",", 6, 0)
-
-    For i = 1 To 2
-        For j = 1 To 3
-          k = 3 * ( i - 1 ) + j
-          If result(k) = nan Then
-            Success = False  
-          Else 
-            coef(i, j) = result(k)
-        Next j
-    Next i
+  
 EndSub 
 
 'Network Connection Variables
@@ -188,61 +153,7 @@ Public irr_param_file_success As Boolean = False
 Public file_open_successful As Boolean = False 
 Public last_modified_time As Long
  
-Sub LoadIrrParam(last_time, r_coef(2,3), h_coef(2,3))
-  Dim Line As String * 100
-  Dim FileHandle
-  Dim Successful As Boolean  
 
-  FileHandle = FileOpen("CPU:input_irr_params.txt", "r", 0)
-  Successful = (FileHandle <> 0)
-  file_open_successful = Successful
-  If Successful Then
-    last_time = FileTime(FileHandle)
-    ' Read first row into r_coef
-    FileReadLine(FileHandle, Line, 100)
-    Call ParseLine(r_coef(), Line, Successful)
-    
-
-    ' Read second row into h_coef
-    FileReadLine(FileHandle, Line, 100)
-    Call ParseLine(h_coef(), Line, Successful)
-
-    FileClose(FileHandle)
-    irr_param_file_success = True
-  EndIf 
-
-  If Successful <> True Then  
-    irr_param_file_success = False 
-    heatmanset = 0
-    
-    ' use defaults
-    r_coef(1,1) = 101848
-    r_coef(1,2) = 8398310
-    r_coef(1,3) = 1470590000
-    r_coef(2,1) = 7563.48
-    r_coef(2,2) = -11293.4
-    r_coef(2,3) = -3885300
-
-    h_coef(1,1) = 115646
-    h_coef(1,2) = 11052800
-    h_coef(1,3) = 1936590000
-    h_coef(2,1) = 3652.01
-    h_coef(2,2) = 111740
-    h_coef(2,3) = -15882800 
-  EndIf
-EndSub
-
-Sub CheckForIrrParamUpdate (last_time, r_coef, h_coef)
-    Dim current_time As Long
-    Dim timeStampChanged As Boolean 
-    
-    current_time = FileTime("CPU:input_irr_params.txt")
-    timeStampChanged = current_time <> last_time
-    If timeStampChanged Then
-        LoadIrrParam(last_time, r_coef, h_coef)
-        last_time = current_time
-    EndIf
-EndSub  
 
 ' Define Data Tables (these are the final stored programs)
 '  !!!!!!Note to change the name of all the files according to plot.
@@ -264,7 +175,6 @@ DataTable (raw, True, -1)           ' Change based on plot
   Totalize (1, ekmMeterPulseCount, UINT4, 0)
   Sample (1, ekmMeterKWh, IEEE4)
   Sample (1, irr_param_file_success, Boolean, 0)
-  Average (1, LostConnection, FP2, 0)
 EndTable
 
 DataTable(irr_params, True, -1)
@@ -292,7 +202,74 @@ EndTable
 '****************************************************************************************
 ' Main Program
 BeginProg
-    Call LoadIrrParam(last_modified_time, r_coef, h_coef)
+  Dim Line As String * 100
+  Dim current_time As Long
+  Dim timeStampChanged As Boolean   
+  Dim FileHandle
+  Dim Successful As Boolean  
+  Dim i, j, k
+  Dim result(6)
+
+  FileHandle = FileOpen("CPU:input_irr_params.txt", "r", 0)
+  Successful = (FileHandle <> 0)
+  file_open_successful = Successful
+  If Successful Then
+    last_time = FileTime(FileHandle)
+    ' Read first row into r_coef
+    FileReadLine(FileHandle, Line, 100)   
+
+    result() = nan   
+    SplitStr(result(), Line, ",", 6, 0)
+
+    For i = 1 To 2
+        For j = 1 To 3
+          k = 3 * ( i - 1 ) + j
+          If result(k) = nan Then
+            Successful = False  
+          Else 
+            r_coef(i, j) = result(k)
+        Next j
+    Next i
+
+    ' Read second row into h_coef
+    FileReadLine(FileHandle, Line, 100)
+    result() = nan   
+    SplitStr(result(), Line, ",", 6, 0)
+
+    For i = 1 To 2
+        For j = 1 To 3
+          k = 3 * ( i - 1 ) + j
+          If result(k) = nan Then
+            Successful = False  
+          Else 
+            h_coef(i, j) = result(k)
+        Next j
+    Next i
+
+
+    FileClose(FileHandle)
+    irr_param_file_success = True
+  EndIf 
+
+  If Successful <> True Then  
+    irr_param_file_success = False 
+    heatmanset = 0
+    
+    ' use defaults
+    r_coef(1,1) = 101848
+    r_coef(1,2) = 8398310
+    r_coef(1,3) = 1470590000
+    r_coef(2,1) = 7563.48
+    r_coef(2,2) = -11293.4
+    r_coef(2,3) = -3885300
+
+    h_coef(1,1) = 115646
+    h_coef(1,2) = 11052800
+    h_coef(1,3) = 1936590000
+    h_coef(2,1) = 3652.01
+    h_coef(2,2) = 111740
+    h_coef(2,3) = -15882800 
+  EndIf
     Scan(1, sec, 0, 1)  ' Log the IRR parameters only once, at the start of the program.
         CallTable irr_params
         ExitScan
@@ -318,8 +295,8 @@ BeginProg
                    ' a time-space anomaly which would destroy the universe.  Maybe.
   delta_t = 5      ' Execution interval.  This must match with the 'Scan' interval below.
 
-  is_rain_control = OnlyIfStationNameIs("26164")  ' True or False. Use the station name of the logger you want to use for rain control.
-  has_ekm_meter = OnlyIfStationNameIs("24242")
+  is_rain_control = (Status.StationName(1,1) = "26164") ' True or False. Use the station name of the logger you want to use for rain control.
+  has_ekm_meter = (Status.StationName(1,1) = "24242")
 
   PulseCountReset  ' This resets all pulse counts.  Not sure if it's needed, but whatever.
 
@@ -338,7 +315,14 @@ BeginProg
     VoltDiff(mV_tpileR, 1, mV7_5, 1, True , 0, _60Hz, 1.0, 0) ' Diff channel 1
     ' Measure ratios Vx/Vb of body thermistors of Reference IRTs
     Therm109(TbodyRC, 1, 5, Vx1, 0, _60Hz, 1.0, 0) ' SE channel 5
-    TtarRC = ComputeTargetTemp(TbodyRC, mV_tpileR, r_coef)
+    Dim m, b, par, temp_kelvin
+    m = (r_coef(1,1) * TbodyRC + r_coef(1,2)) * TbodyRC + r_coef(1,3)
+    b = (r_coef(2,1) * TbodyRC + r_coef(2,2)) * TbodyRC + r_coef(2,3)
+    
+    ' Calculation of target temperature
+    par = m * mV_tpileR + b 
+    temp_kelvin = temp_c + 273.15
+    TtarHC = (temp_kelvin^4 + par) ^ 0.25  - 273.15
 
     ' For Heated Plots
     ' Measure thermopile voltages of T-FACE Heated IRTs
@@ -346,6 +330,15 @@ BeginProg
     ' Measure ratios Vx/Vb of body thermistors of Heated IRTs
     Therm109 (TbodyHC, 1, 6, Vx1, 0, _60Hz, 1.0, 0)
     TtarHC = ComputeTargetTemp(TbodyHC, mV_tpileH, h_coef)
+    
+    ' Calculation of m (slope) and b (intercept) coefficients for target temperature calculation
+    m = (h_coef(1,1) * TbodyHC + h_coef(1,2)) * TbodyHC + h_coef(1,3)
+    b = (h_coef(2,1) * TbodyHC + h_coef(2,2)) * TbodyHC + h_coef(2,3)
+    
+    ' Calculation of target temperature
+    par = m * mV_tpileH + b 
+    temp_kelvin = temp_c + 273.15
+    TtarHC = (temp_kelvin^4 + par) ^ 0.25  - 273.15
 
 
     '*******************************************************
@@ -393,7 +386,10 @@ BeginProg
     SDMCVO4 (ScldOut(), 4, 0, 10)' Send instruction to SDM-CV04s (mV, reps, SDMaddress, volts)
     '**********************************************************
 
-    Call CheckIfRaining
+    If is_rain_control Then
+      ReadIO(rain_byte_flag, 8)  ' byte flag. This checks is there is a 5 V signal coming into C4. The value returned by ReadIO is a byte flag, and the fourth bit is one (decimal value of 8) if C4 is high.
+      is_raining = (rain_byte_flag = 8)  ' True or False. If that bit high, it's raining.
+    EndIf
 
     ' EKM Omnimeter read pulse count and convert to KW*H
     ' I know the conversion can be done in one step with PulseCount() but want both the raw count and the conversion
@@ -411,7 +407,73 @@ BeginProg
   SlowSequence
     Scan(600, Sec, 0, 0)
       ' Check if irr params should be updated
-      Call CheckForIrrParamUpdate(last_modified_time, r_coef, h_coef)
+ 
+    
+    current_time = FileTime("CPU:input_irr_params.txt")
+    timeStampChanged = current_time <> last_modified_time
+    If timeStampChanged Then
+        FileHandle = FileOpen("CPU:input_irr_params.txt", "r", 0)
+        Successful = (FileHandle <> 0)
+        file_open_successful = Successful
+        If Successful Then
+          last_time = FileTime(FileHandle)
+          ' Read first row into r_coef
+          FileReadLine(FileHandle, Line, 100)   
+
+          result() = nan   
+          SplitStr(result(), Line, ",", 6, 0)
+
+          For i = 1 To 2
+              For j = 1 To 3
+                k = 3 * ( i - 1 ) + j
+                If result(k) = nan Then
+                  Successful = False  
+                Else 
+                  r_coef(i, j) = result(k)
+              Next j
+          Next i
+
+          ' Read second row into h_coef
+          FileReadLine(FileHandle, Line, 100)
+          result() = nan   
+          SplitStr(result(), Line, ",", 6, 0)
+
+          For i = 1 To 2
+              For j = 1 To 3
+                k = 3 * ( i - 1 ) + j
+                If result(k) = nan Then
+                  Successful = False  
+                Else 
+                  h_coef(i, j) = result(k)
+              Next j
+          Next i
+
+
+          FileClose(FileHandle)
+          irr_param_file_success = True
+        EndIf 
+
+        If Successful <> True Then  
+          irr_param_file_success = False 
+          heatmanset = 0
+          
+          ' use defaults
+          r_coef(1,1) = 101848
+          r_coef(1,2) = 8398310
+          r_coef(1,3) = 1470590000
+          r_coef(2,1) = 7563.48
+          r_coef(2,2) = -11293.4
+          r_coef(2,3) = -3885300
+
+          h_coef(1,1) = 115646
+          h_coef(1,2) = 11052800
+          h_coef(1,3) = 1936590000
+          h_coef(2,1) = 3652.01
+          h_coef(2,2) = 111740
+          h_coef(2,3) = -15882800 
+        EndIf
+        last_modified_time = current_time
+    EndIf
 
       ' The loggers often lose network connection and the wireless hardware needs to be restarted.
       ' This periodically checks whether there's a newtwork connection and if not it turns off
@@ -424,8 +486,6 @@ BeginProg
         SW12(False)
         Delay(1, 10, sec)
         SW12(True)
-      Else
-        LostConnection = False 
       EndIf
     NextScan
   EndSequence
