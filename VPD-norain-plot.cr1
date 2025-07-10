@@ -83,11 +83,6 @@ Dim cons_m, cons_b,
 Public upper_lim, lower_lim, heatmanset, rainon
 Dim Eff, Maxrad
 
-' Public variables for power metering using EKM Omnimeter I v.3
-Public ekmMeterPulseCount As Long 
-Public ekmMeterKWh = nan 
-Public has_ekm_meter As Boolean
-
 Dim delta_t            ' Need to set delta_t to execution interval
 Dim P_error, D_dMVovdt
 Dim Prev_Meas, Prev_Err
@@ -95,10 +90,19 @@ Dim Kp_x_P, Kd_x_D, Sum_KpKdKi
 Dim r_m, h_m, r_b, h_b
 Dim PID_CR, Radjust, Th_Adjust, Rheater, Rreflect, R_IRT
 
+' Public variables for power metering using EKM Omnimeter I v.3
+Public ekmMeterPulseCount As Long 
+Public ekmMeterKWh = nan 
+Public has_ekm_meter As Boolean
+
 ' RainDetector Variables & Code
 Public is_raining As Boolean = True  ' Start with the assumption that it's raining, and in the first scan it will get the correct value.
 Public is_rain_control As Boolean
 Dim rain_byte_flag
+
+'Network Connection Variables
+Public PingResult As Long 
+Public LostConnection As Boolean = False 
 
 
 ' Define Data Tables (these are the final stored programs)
@@ -346,4 +350,22 @@ BeginProg
     CallTable control  ' Change based on plot
 
   NextScan
+  
+  SlowSequence
+    Scan(1200, Sec, 0, 0)
+    
+      ' The loggers often lose network connection and the wireless hardware needs to be restarted.
+      ' This periodically checks whether there's a newtwork connection and if not it turns off
+      ' the 12 V connection that powers the wireless controller.
+  
+      PingResult = PingIP("192.168.1.95", 2000)
+      
+      ' If PingResult = 0 Then
+       '' LostConnection = True
+       '' SW12(False)
+       '' Delay(1, 10, sec)
+      ''  SW12(True)
+      'EndIf
+    NextScan
+  EndSequence
 EndProg
