@@ -349,8 +349,7 @@ BeginProg
   SlowSequence
     Scan(2, hr, 0, 0)
       ' The loggers often lose network connection and the wireless hardware needs to be restarted.
-      ' this code disconnects the wireless controller periodically for Aphrodite.
-      ' the 12 V connection that powers the wireless controller.
+      ' This code restarts  the 12 V connection that powers the wireless controller, only for Aphrodite.
   
       If (Status.StationName(1,1) = "24242") Then 
         SW12(False)
