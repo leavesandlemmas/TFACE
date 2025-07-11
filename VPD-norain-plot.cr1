@@ -170,10 +170,10 @@ Sub PIRcontrol
   windup_lower_lim = lower_lim - clampLenienceInterval
   
   AddErrCond = _
+    ((rawPIDOutput < windup_upper_lim AND rawPIDOutput > windup_lower_lim)) OR _  ' If the PID output is not saturated, add to the integral sum.
     ((rawPIDOutput >= windup_upper_lim) AND (Prev_err > 0)) OR _   ' Positive error means cooling, so if we're above the upper limit, we add only positive errors to the integral sum to cool down.
-    ((rawPIDOutput <= windup_lower_lim) AND (Prev_err < 0)) OR _ ' Negative error means heating, so if we're below the lower limit, we add only negative errors to the integral sum to heat up.
-    ((rawPIDOutput < windup_upper_lim AND rawPIDOutput > windup_lower_lim))   ' If the PID output is not saturated, add to the integral sum.
-  
+    ((rawPIDOutput <= windup_lower_lim) AND (Prev_err < 0)) ' Negative error means heating, so if we're below the lower limit, we add only negative errors to the integral sum to heat up.
+    
   If AddErrCond Then 
     IxKi_sum = IxKi_sum + Prev_Err    
   EndIf
