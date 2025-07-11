@@ -100,9 +100,6 @@ Public is_raining As Boolean = True  ' Start with the assumption that it's raini
 Public is_rain_control As Boolean
 Dim rain_byte_flag
 
-'Network Connection Variables
-
-
 ' Define Data Tables (these are the final stored programs)
 '  !!!!!!Note to change the name of all the files according to plot.
 ' This table is for all the heater array raw variables
@@ -350,13 +347,12 @@ BeginProg
   NextScan
   
   SlowSequence
-    Scan(3600, Sec, 0, 0)
-    
+    Scan(2, hr, 0, 0)
       ' The loggers often lose network connection and the wireless hardware needs to be restarted.
       ' this code disconnects the wireless controller periodically for Aphrodite.
       ' the 12 V connection that powers the wireless controller.
   
-      If (Status.StationName(1,1) == "24242") Then 
+      If (Status.StationName(1,1) = "24242") Then 
         SW12(False)
         Delay(1, 10, sec)
         SW12(True)
