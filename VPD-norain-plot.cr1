@@ -56,6 +56,7 @@ Const twopi = 6.283185
 Const piov2 = 1.5708
 Const SB = 5.67E-8
 Const MODE = -1
+Const SW12_port = SW12_1
 
 ' Declare Public Variables
 Public Kp, Ki, Kd
@@ -145,11 +146,13 @@ Function voltageLimiter(old_voltage, new_voltage, delta_t)
   EndIf
 EndFunction
 
+
 '  Subroutine to compute PID output control signal
 '  Original version written with EDLOG by Tony Wahl from Campbell Scientific
 Sub PIRcontrol
   'first set
   Dim windup_upper_lim, windup_lower_lim
+  Dim AddErrCond As Boolean
   
   P_error = T_Diffrns - Target		                   'PROPORTIONAL
   Kp_x_P = P_error*Kp
@@ -165,12 +168,13 @@ Sub PIRcontrol
   ' When checking saturation for windup, use a slightly permissive range. Otherwise it causes oscillations when near the extremes.
   windup_upper_lim = upper_lim + clampLenienceInterval
   windup_lower_lim = lower_lim - clampLenienceInterval
-  ' Since every condition does the same thing, the following would be more sensible if the three states that were combined using OR into a single statement. 
-  If rawPIDOutput < windup_upper_lim AND rawPIDOutput > windup_lower_lim Then ' If the PID output is not saturated, add to the integral sum.
-    IxKi_sum = IxKi_sum + Prev_Err    
-  Else If rawPIDOutput >= windup_upper_lim AND Prev_err > 0 Then ' Positive error means cooling, so if we're above the upper limit, we add only positive errors to the integral sum to cool down.
-    IxKi_sum = IxKi_sum + Prev_Err    
-  Else If rawPIDOutput <= windup_lower_lim AND Prev_err < 0 Then ' Negative error means heating, so if we're below the lower limit, we add only negative errors to the integral sum to heat up.
+  
+  AddErrCond = _
+    ((rawPIDOutput >= windup_upper_lim) AND (Prev_err > 0)) OR _   ' Positive error means cooling, so if we're above the upper limit, we add only positive errors to the integral sum to cool down.
+    ((rawPIDOutput <= windup_lower_lim) AND (Prev_err < 0)) OR _ ' Negative error means heating, so if we're below the lower limit, we add only negative errors to the integral sum to heat up.
+    ((rawPIDOutput < windup_upper_lim AND rawPIDOutput > windup_lower_lim))   ' If the PID output is not saturated, add to the integral sum.
+  
+  If AddErrCond Then 
     IxKi_sum = IxKi_sum + Prev_Err    
   EndIf
 
@@ -299,6 +303,8 @@ BeginProg
 
   is_rain_control = (Status.StationName(1,1) = "26164")
   has_ekm_meter = (Status.StationName(1,1) = "24242") ' Aphrodite'
+  'Ensure SW12 is on
+  SW12(SW12_port, True)
 
   PulseCountReset  ' This resets all pulse counts.  Not sure if it's needed, but whatever.
 
@@ -417,9 +423,9 @@ BeginProg
       ' the 12 V connection that powers the wireless controller.
   
       If (Status.StationName(1,1) == "24242") Then 
-        SW12(False)
+        SW12(SW12_port, False)
         Delay(1, 10, sec)
-        SW12(True)
+        SW12(SW12_port, True)
       EndIf
     NextScan
   EndSequence
